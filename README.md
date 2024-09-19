@@ -1,3 +1,3 @@
 # my-chip8
 
-A simple CHIP-8 emulator written in Rust that I made for learning purposes. It uses SDL2 for rendering and handling input.
+A simple CHIP-8 interpreter written in Rust. It uses SDL2 for rendering and handling input. I made this project to learn the Rust programming language and as a foray into emulation development.
