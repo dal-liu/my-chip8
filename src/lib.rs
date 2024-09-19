@@ -3,8 +3,12 @@ use std::fs;
 
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
+const KEYPAD_SIZE: usize = 16;
 const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
+const SPRITE_END: usize = 0x9f;
+const SPRITE_SIZE: u16 = 5;
+const SPRITE_START: usize = 0x50;
 const STACK_SIZE: usize = 16;
 const START_ADDR: u16 = 0x200;
 
@@ -20,6 +24,7 @@ pub struct Chip8 {
     sound_timer: u8,
     v: [u8; NUM_REGISTERS],
     draw_flag: bool,
+    keypad: [u8; KEYPAD_SIZE],
 }
 
 impl Chip8 {
@@ -45,7 +50,7 @@ impl Chip8 {
             0xf0, 0x80, 0xf0, 0x80, 0x80, // F
         ];
 
-        (0x50..=0x09f)
+        (SPRITE_START..=SPRITE_END)
             .into_iter()
             .zip(font.iter())
             .for_each(|(i, &d)| memory[i] = d);
@@ -61,6 +66,7 @@ impl Chip8 {
             v: [0; NUM_REGISTERS],
             sp: 0,
             draw_flag: false,
+            keypad: [0; KEYPAD_SIZE],
         }
     }
 
@@ -84,6 +90,14 @@ impl Chip8 {
         self.draw_flag
     }
 
+    pub fn key_down(&mut self, key: u8) {
+        self.keypad[key as usize] = 1;
+    }
+
+    pub fn key_up(&mut self, key: u8) {
+        self.keypad[key as usize] = 0;
+    }
+
     fn fetch_inst(&mut self) -> u16 {
         let pc = self.pc as usize;
         let byte1 = self.memory[pc] as u16;
@@ -102,10 +116,10 @@ impl Chip8 {
         let nnn = opcode & 0x0fff;
 
         match (opcode & 0xf000) >> 12 {
-            0x0 => match nn {
-                0xe0 => self.clear_display(),
-                0xee => self.ret(),
-                _ => panic!("Unknown opcode: {opcode}"),
+            0x0 => match nnn {
+                0x0e0 => self.clear_display(),
+                0x0ee => self.ret(),
+                _ => (),
             },
             0x1 => self.jump(nnn),
             0x2 => self.call(nnn),
@@ -124,14 +138,31 @@ impl Chip8 {
                 0x6 => self.right_shift(x),
                 0x7 => self.rsb_reg_from_reg(x, y),
                 0xe => self.left_shift(x),
-                _ => panic!("Unknown opcode: {opcode}"),
+                _ => panic!("Unknown opcode: {:x?}", opcode),
             },
             0x9 => self.skip_if_reg_neq_reg(x, y),
             0xa => self.set_i_to_addr(nnn),
             0xb => self.jump_with_offset(nnn),
             0xc => self.set_reg_to_rand(x, nn),
             0xd => self.draw(x, y, n),
-            _ => panic!("Unknown opcode: {opcode}"),
+            0xe => match nn {
+                0x9e => self.skip_if_key_pressed(x),
+                0xa1 => self.skip_if_key_not_pressed(x),
+                _ => panic!("Unknown opcode: {:x?}", opcode),
+            },
+            0xf => match nn {
+                0x07 => self.get_delay_timer(x),
+                0x0a => self.get_key(x),
+                0x15 => self.set_delay_timer(x),
+                0x18 => self.set_sound_timer(x),
+                0x1e => self.add_reg_to_i(x),
+                0x29 => self.set_i_to_font(x),
+                0x33 => self.set_bdc(x),
+                0x55 => self.reg_dump(x),
+                0x65 => self.reg_load(x),
+                _ => panic!("Unknown opcode: {:x?}", opcode),
+            },
+            _ => panic!("Unknown opcode: {:x?}", opcode),
         };
     }
 
@@ -141,10 +172,10 @@ impl Chip8 {
     }
 
     fn ret(&mut self) {
+        self.sp -= 1;
         let sp = self.sp as usize;
         self.pc = self.stack[sp];
         self.stack[sp] = 0;
-        self.sp -= 1;
     }
 
     fn jump(&mut self, addr: u16) {
@@ -272,5 +303,71 @@ impl Chip8 {
         }
 
         self.draw_flag = true;
+    }
+
+    fn skip_if_key_pressed(&mut self, x: usize) {
+        if self.keypad[self.v[x] as usize] != 0 {
+            self.pc += 2;
+        }
+    }
+
+    fn skip_if_key_not_pressed(&mut self, x: usize) {
+        if self.keypad[self.v[x] as usize] == 0 {
+            self.pc += 2;
+        }
+    }
+
+    fn get_delay_timer(&mut self, x: usize) {
+        self.v[x] = self.delay_timer;
+    }
+
+    fn get_key(&mut self, x: usize) {
+        let mut key_pressed = false;
+        for i in 0..KEYPAD_SIZE {
+            if self.keypad[i] != 0 {
+                self.v[x] = i as u8;
+                key_pressed = true;
+                break;
+            }
+        }
+        if !key_pressed {
+            self.pc -= 2;
+        }
+    }
+
+    fn set_delay_timer(&mut self, x: usize) {
+        self.delay_timer = self.v[x];
+    }
+
+    fn set_sound_timer(&mut self, x: usize) {
+        self.sound_timer = self.v[x];
+    }
+
+    fn add_reg_to_i(&mut self, x: usize) {
+        self.i += self.v[x] as u16;
+    }
+
+    fn set_i_to_font(&mut self, x: usize) {
+        self.i = self.v[x] as u16 * SPRITE_SIZE + SPRITE_START as u16;
+    }
+
+    fn set_bdc(&mut self, x: usize) {
+        let i = self.i as usize;
+        let x = self.v[x];
+        self.memory[i] = x / 100;
+        self.memory[i + 1] = (x / 10) % 10;
+        self.memory[i + 2] = x % 10;
+    }
+
+    fn reg_dump(&mut self, x: usize) {
+        for j in 0..=x {
+            self.memory[self.i as usize + j] = self.v[j];
+        }
+    }
+
+    fn reg_load(&mut self, x: usize) {
+        for j in 0..=x {
+            self.v[j] = self.memory[self.i as usize + j];
+        }
     }
 }
