@@ -9,13 +9,15 @@ use std::time::Duration;
 
 fn main() {
     let mut chip8 = Chip8::new();
-    chip8.load_rom("roms/IBM Logo.ch8");
+
+    let rom_path = "roms/IBM Logo.ch8";
+    chip8.load_rom(&rom_path);
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
     let window = video_subsystem
-        .window("CHIP-8 Emulator", 1280, 640)
+        .window(&rom_path[5..rom_path.len() - 4], 1280, 640)
         .position_centered()
         .build()
         .unwrap();
