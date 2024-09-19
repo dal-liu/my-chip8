@@ -10,7 +10,6 @@ use std::env;
 use std::time::Duration;
 
 const BACKGROUND_COLOR: Color = Color::BLACK;
-const CYCLES_PER_SECOND: f64 = 700.0;
 const FOREGROUND_COLOR: Color = Color::WHITE;
 const PIXEL_SIZE: f32 = 20.0;
 
@@ -41,21 +40,21 @@ fn main() {
     canvas.present();
 
     let scancode_to_key = HashMap::from([
-        (Scancode::Num1, 0x0),
-        (Scancode::Num2, 0x1),
-        (Scancode::Num3, 0x2),
-        (Scancode::Num4, 0x3),
+        (Scancode::Num1, 0x1),
+        (Scancode::Num2, 0x2),
+        (Scancode::Num3, 0x3),
+        (Scancode::Num4, 0xc),
         (Scancode::Q, 0x4),
         (Scancode::W, 0x5),
         (Scancode::E, 0x6),
-        (Scancode::R, 0x7),
-        (Scancode::A, 0x8),
-        (Scancode::S, 0x9),
-        (Scancode::D, 0xa),
-        (Scancode::F, 0xb),
-        (Scancode::Z, 0xc),
-        (Scancode::X, 0xd),
-        (Scancode::C, 0xe),
+        (Scancode::R, 0xd),
+        (Scancode::A, 0x7),
+        (Scancode::S, 0x8),
+        (Scancode::D, 0x9),
+        (Scancode::F, 0xe),
+        (Scancode::Z, 0xa),
+        (Scancode::X, 0x0),
+        (Scancode::C, 0xb),
         (Scancode::V, 0xf),
     ]);
 
@@ -102,6 +101,6 @@ fn main() {
             }
         }
 
-        std::thread::sleep(Duration::from_secs_f64(1.0 / CYCLES_PER_SECOND));
+        std::thread::sleep(Duration::from_secs_f64(1.0 / my_chip8::CYCLES_PER_SECOND));
     }
 }

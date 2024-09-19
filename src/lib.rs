@@ -1,6 +1,7 @@
 use rand::Rng;
 use std::fs;
 
+pub const CYCLES_PER_SECOND: f64 = 600.0;
 pub const DISPLAY_WIDTH: usize = 64;
 pub const DISPLAY_HEIGHT: usize = 32;
 const KEYPAD_SIZE: usize = 16;
@@ -11,6 +12,7 @@ const SPRITE_SIZE: u16 = 5;
 const SPRITE_START: usize = 0x50;
 const STACK_SIZE: usize = 16;
 const START_ADDR: u16 = 0x200;
+const TIMER_FREQ: f64 = 60.0;
 
 #[derive(Debug)]
 pub struct Chip8 {
@@ -25,6 +27,7 @@ pub struct Chip8 {
     v: [u8; NUM_REGISTERS],
     draw_flag: bool,
     keypad: [u8; KEYPAD_SIZE],
+    internal_timer: f64,
 }
 
 impl Chip8 {
@@ -67,6 +70,7 @@ impl Chip8 {
             sp: 0,
             draw_flag: false,
             keypad: [0; KEYPAD_SIZE],
+            internal_timer: 0.0,
         }
     }
 
@@ -78,6 +82,15 @@ impl Chip8 {
 
     pub fn run_cycle(&mut self) {
         self.draw_flag = false;
+
+        if self.internal_timer > 0.0 {
+            self.internal_timer -= 1.0;
+        } else {
+            self.internal_timer = CYCLES_PER_SECOND / TIMER_FREQ;
+            self.delay_timer = self.delay_timer.saturating_sub(1);
+            self.sound_timer = self.sound_timer.saturating_sub(1);
+        }
+
         let opcode = self.fetch_inst();
         self.execute_inst(opcode);
     }
@@ -99,9 +112,8 @@ impl Chip8 {
     }
 
     fn fetch_inst(&mut self) -> u16 {
-        let pc = self.pc as usize;
-        let byte1 = self.memory[pc] as u16;
-        let byte2 = self.memory[pc + 1] as u16;
+        let byte1 = self.memory[self.pc as usize] as u16;
+        let byte2 = self.memory[self.pc as usize + 1] as u16;
 
         self.pc += 2;
 
@@ -173,9 +185,8 @@ impl Chip8 {
 
     fn ret(&mut self) {
         self.sp -= 1;
-        let sp = self.sp as usize;
-        self.pc = self.stack[sp];
-        self.stack[sp] = 0;
+        self.pc = self.stack[self.sp as usize];
+        self.stack[self.sp as usize] = 0;
     }
 
     fn jump(&mut self, addr: u16) {
@@ -288,6 +299,9 @@ impl Chip8 {
             for col in 0..8 {
                 if (sprite & (0x80 >> col)) != 0 {
                     let index = x + col + ((y + row as usize) * DISPLAY_WIDTH);
+                    if index >= DISPLAY_WIDTH * DISPLAY_HEIGHT {
+                        break;
+                    }
                     if self.display[index] == 1 {
                         self.v[0xf] = 1;
                     }
