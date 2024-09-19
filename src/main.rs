@@ -7,6 +7,11 @@ use sdl2::pixels::Color;
 use sdl2::rect::Point;
 use std::time::Duration;
 
+const PIXEL_SIZE: f32 = 20.0;
+const BACKGROUND_COLOR: Color = Color::BLACK;
+const FOREGROUND_COLOR: Color = Color::WHITE;
+const CYCLES_PER_SECOND: f64 = 700.0;
+
 fn main() {
     let mut chip8 = Chip8::new();
 
@@ -24,24 +29,24 @@ fn main() {
 
     let mut canvas = window.into_canvas().build().unwrap();
 
-    canvas.set_scale(20.0, 20.0).unwrap();
-    canvas.set_draw_color(Color::BLACK);
+    canvas.set_scale(PIXEL_SIZE, PIXEL_SIZE).unwrap();
+    canvas.set_draw_color(BACKGROUND_COLOR);
     canvas.clear();
     canvas.present();
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
-        chip8.run();
+        chip8.run_cycle();
 
         if chip8.draw_flag() {
-            canvas.set_draw_color(Color::BLACK);
+            canvas.set_draw_color(BACKGROUND_COLOR);
             canvas.clear();
 
-            canvas.set_draw_color(Color::WHITE);
+            canvas.set_draw_color(FOREGROUND_COLOR);
             chip8.display().iter().enumerate().for_each(|(i, &pixel)| {
                 if pixel == 1 {
-                    let x = (i % 64).try_into().unwrap();
-                    let y = (i / 64).try_into().unwrap();
+                    let x = (i % my_chip8::DISPLAY_WIDTH).try_into().unwrap();
+                    let y = (i / my_chip8::DISPLAY_WIDTH).try_into().unwrap();
                     canvas.draw_point(Point::new(x, y)).unwrap();
                 }
             });
@@ -60,6 +65,6 @@ fn main() {
             }
         }
 
-        std::thread::sleep(Duration::from_secs_f64(1.0 / 700.0));
+        std::thread::sleep(Duration::from_secs_f64(1.0 / CYCLES_PER_SECOND));
     }
 }
